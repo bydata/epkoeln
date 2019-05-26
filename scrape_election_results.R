@@ -47,7 +47,8 @@ election_results <- result_df %>%
     Wahlbeteiligung = `Wähler/innen`,
     gueltig = `gültig`,
     GRUENE = `GRÜNE`
-  )
+  ) %>%
+  as_tibble()
 
 
 # cleanup
@@ -55,7 +56,37 @@ rm(list = c("page", "result_table", "result_df"))
 
 
 
+### scrape boroughs to districts for Cologne and reshape the data frame
+url_wiki <- "https://de.wikipedia.org/wiki/Liste_der_Stadtbezirke_und_Stadtteile_K%C3%B6lns"
+page <- get_content(url_wiki)
+table_xpath = "//*[@id='mw-content-text']/div/table[2]"
+districts_table <- html_node(page, xpath = table_xpath)
+districts_df <- html_table(districts_table, dec = ",", fill = FALSE, header = TRUE)
 
-### scrape boroughs to districts for Cologne
-
+districts <- districts_df %>%
+  filter(Name != "Stadt Köln") %>%
+  rename(Stadtteil_Nr = `Nr.`) %>%
+  mutate(key = ifelse(
+    Stadtteil_Nr < 10,
+    Stadtteil_Nr,
+    floor(Stadtteil_Nr/100)
+  )) %>%
+  group_by(key) %>%
+  mutate(Stadtbezirk = first(Name)) %>%
+  filter(Stadtteil_Nr > 100) %>%
+  ungroup() %>%
+  select(-key) %>%
+  mutate(
+    Name = case_when(
+      Name == "Marienburg (Köln)" ~ "Marienburg",
+      Name == "Altstadt-Nord" ~ "Altstadt/Nord",
+      Name == "Altstadt-Süd" ~ "Altstadt/Süd",
+      Name == "Neustadt-Nord" ~ "Neustadt/Nord",
+      Name == "Neustadt-Süd" ~ "Neustadt/Süd",
+      TRUE ~ Name
+    )
+  )
+  
+# cleanup
+rm(list = c("page", "districts_table", "districts_df"))
 
